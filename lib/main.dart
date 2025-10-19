@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'translator_page.dart';
 import 'speech_to_text_page.dart';
 import 'text_to_speech_page.dart';
-import 'translator_page.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -11,32 +13,31 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '음성 번역 통합 앱',
-      debugShowCheckedModeBanner: false,
+      title: 'Translation App',
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
-        colorSchemeSeed: Colors.deepPurple,
-        scaffoldBackgroundColor: Colors.grey.shade50,
       ),
-      home: const MainPage(),
+      home: const HomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<MainPage> createState() => _MainPageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const SpeechToTextPage(),
-    const TextToSpeechPage(),
-    const TranslatorPage(),
+  final List<Widget> _pages = const [
+    TranslatorPage(),
+    SpeechToTextPage(),
+    TextToSpeechPage(),
   ];
 
   @override
@@ -46,25 +47,20 @@ class _MainPageState extends State<MainPage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.mic_outlined),
-            selectedIcon: Icon(Icons.mic),
+            icon: Icon(Icons.translate),
+            label: 'Translate',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.mic),
             label: 'STT',
           ),
           NavigationDestination(
-            icon: Icon(Icons.volume_up_outlined),
-            selectedIcon: Icon(Icons.volume_up),
+            icon: Icon(Icons.volume_up),
             label: 'TTS',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.translate_outlined),
-            selectedIcon: Icon(Icons.translate),
-            label: '번역기',
           ),
         ],
       ),

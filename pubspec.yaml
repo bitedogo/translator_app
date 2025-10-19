@@ -9,9 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # 백엔드 API 통신을 위해 http 패키지 추가 (필수)
+  http: ^1.0.0
   speech_to_text: ^7.0.0
   flutter_tts: ^3.6.3
-  translator: ^0.1.7
+  # translator 패키지를 최신 버전으로 업그레이드하여 http ^1.0.0과의 호환성 문제 해결
+  translator: ^1.0.4+1
 
 dev_dependencies:
   flutter_test:
