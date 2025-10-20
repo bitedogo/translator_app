@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'translator_page.dart';
-import 'speech_to_text_page.dart';
-import 'text_to_speech_page.dart';
+import 'pages/translator_page.dart';
+import 'pages/speech_to_text_page.dart';
+import 'pages/text_to_speech_page.dart';
+import 'pages/translation_history_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,9 +41,30 @@ class _HomePageState extends State<HomePage> {
     TextToSpeechPage(),
   ];
 
+  void _navigateToHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TranslationHistoryPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('번역 앱'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _navigateToHistory,
+            tooltip: '번역 기록',
+          ),
+        ],
+      ),
       body: _pages[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,

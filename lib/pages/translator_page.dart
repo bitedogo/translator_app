@@ -5,26 +5,6 @@ import 'dart:convert';
 
 const String baseUrl = 'http://10.0.2.2:3000';
 
-class TranslationRecord {
-  final int id;
-  final String originalText;
-  final String translatedText;
-
-  TranslationRecord({
-    required this.id,
-    required this.originalText,
-    required this.translatedText,
-  });
-
-  factory TranslationRecord.fromJson(Map<String, dynamic> json) {
-    return TranslationRecord(
-      id: json['ID'] as int,
-      originalText: json['ORIGINAL_TEXT'] as String,
-      translatedText: json['TRANSLATED_TEXT'] as String,
-    );
-  }
-}
-
 enum TtsState { playing, stopped }
 
 class TranslatorPage extends StatefulWidget {
@@ -42,8 +22,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
   TtsState _ttsState = TtsState.stopped;
   bool _isTranslating = false;
 
-  List<TranslationRecord> _recentHistory = [];
-
   final Map<String, String> _languages = {
     '한국어': 'ko',
     'English': 'en',
@@ -59,7 +37,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
   void initState() {
     super.initState();
     _initTTS();
-    _fetchRecentHistory();
   }
 
   @override
@@ -80,34 +57,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
     _flutterTts.setErrorHandler((msg) {
       setState(() => _ttsState = TtsState.stopped);
     });
-  }
-
-  Future<void> _fetchRecentHistory() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/translations/recent?limit=5'),
-      );
-
-      debugPrint('History response status: ${response.statusCode}');
-      debugPrint('History response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(utf8.decode(response.bodyBytes));
-        if (data['success'] == true && data['data'] != null) {
-          final records = (data['data'] as List)
-              .map((item) => TranslationRecord.fromJson(item))
-              .toList();
-
-          debugPrint('Parsed ${records.length} records');
-
-          setState(() {
-            _recentHistory = records;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('History fetch error: $e');
-    }
   }
 
   Future<void> _translate() async {
@@ -146,7 +95,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
           setState(() {
             _translatedController.text = data['translatedText'];
           });
-          await _fetchRecentHistory();
         } else {
           throw Exception(data['error'] ?? '알 수 없는 번역 오류');
         }
@@ -181,51 +129,42 @@ class _TranslatorPageState extends State<TranslatorPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('번역기'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildLanguageSelector(),
-            const SizedBox(height: 16),
-            Flexible(
-              flex: 3,
-              child: _buildTextField(
-                controller: _textController,
-                label: '원본 텍스트',
-                hint: '번역할 내용을 입력하세요...',
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          _buildLanguageSelector(),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildTextField(
+              controller: _textController,
+              label: '원본 텍스트',
+              hint: '번역할 내용을 입력하세요...',
             ),
-            const SizedBox(height: 16),
-            _buildTranslateButton(theme),
-            const SizedBox(height: 16),
-            Flexible(
-              flex: 3,
-              child: _buildTextField(
-                controller: _translatedController,
-                label: '번역 결과',
-                hint: '번역 결과가 여기에 표시됩니다.',
-                readOnly: true,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _ttsState == TtsState.playing ? Icons.stop_circle : Icons.volume_up,
-                    color: theme.colorScheme.primary,
-                  ),
-                  onPressed: _translatedController.text.isNotEmpty
-                      ? (_ttsState == TtsState.playing ? _stop : _speak)
-                      : null,
+          ),
+          const SizedBox(height: 16),
+          _buildTranslateButton(theme),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildTextField(
+              controller: _translatedController,
+              label: '번역 결과',
+              hint: '번역 결과가 여기에 표시됩니다.',
+              readOnly: true,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _ttsState == TtsState.playing ? Icons.stop_circle : Icons.volume_up,
+                  color: theme.colorScheme.primary,
                 ),
+                onPressed: _translatedController.text.isNotEmpty &&
+                    _translatedController.text != '번역 중...' &&
+                    _translatedController.text != '번역 실패'
+                    ? (_ttsState == TtsState.playing ? _stop : _speak)
+                    : null,
               ),
             ),
-            const SizedBox(height: 24),
-            _buildRecentHistoryList(theme),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -362,66 +301,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
           _isTranslating ? '번역 중...' : '번역하기',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-      ),
-    );
-  }
-
-  Widget _buildRecentHistoryList(ThemeData theme) {
-    return Flexible(
-      flex: 2,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              '최근 번역 기록 (5개)',
-              style: theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: _recentHistory.isEmpty
-                ? Center(
-              child: Text(
-                '기록이 없습니다. 번역을 시작하세요!',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            )
-                : ListView.builder(
-              itemCount: _recentHistory.length,
-              itemBuilder: (context, index) {
-                final record = _recentHistory[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  elevation: 1,
-                  child: ListTile(
-                    title: Text(
-                      record.originalText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      record.translatedText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.history, color: Colors.grey),
-                    onTap: () {
-                      setState(() {
-                        _textController.text = record.originalText;
-                        _translatedController.text = record.translatedText;
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

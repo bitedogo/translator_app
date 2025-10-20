@@ -68,88 +68,81 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Text to Speech (TTS)'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    '음성 언어: ',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                  _buildLanguageDropdown(),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      '음성 언어: ',
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                    _buildLanguageDropdown(),
-                  ],
+                padding: const EdgeInsets.all(16.0),
+                child: TextField(
+                  controller: _textController,
+                  decoration: const InputDecoration(
+                    hintText: '여기에 읽을 내용을 입력하세요...',
+                    border: InputBorder.none,
+                  ),
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: Card(
-                elevation: 2,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: _ttsState == TtsState.playing
+                    ? Colors.red.shade400
+                    : theme.colorScheme.primary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: '여기에 읽을 내용을 입력하세요...',
-                      border: InputBorder.none,
-                    ),
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                  ),
+              ),
+              onPressed: _ttsState == TtsState.playing ? _stop : _speak,
+              icon: Icon(
+                _ttsState == TtsState.playing ? Icons.stop : Icons.volume_up,
+              ),
+              label: Text(
+                _ttsState == TtsState.playing ? '멈춤' : '읽어주기',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _ttsState == TtsState.playing
-                      ? Colors.red.shade400
-                      : theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _ttsState == TtsState.playing ? _stop : _speak,
-                icon: Icon(
-                  _ttsState == TtsState.playing ? Icons.stop : Icons.volume_up,
-                ),
-                label: Text(
-                  _ttsState == TtsState.playing ? '멈춤' : '읽어주기',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
