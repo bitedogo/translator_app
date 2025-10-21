@@ -45,6 +45,12 @@ class _TranslationHistoryPageState extends State<TranslationHistoryPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  static const Color darkBg = Color(0xFF0A0E27);
+  static const Color cardBg = Color(0xFF1A1F3A);
+  static const Color goldAccent = Color(0xFFD4AF37);
+  static const Color silverAccent = Color(0xFFC0C0C0);
+  static const Color darkCard = Color(0xFF151932);
+
   @override
   void initState() {
     super.initState();
@@ -106,151 +112,222 @@ class _TranslationHistoryPageState extends State<TranslationHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: darkBg,
       appBar: AppBar(
         title: const Text('번역 기록'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        backgroundColor: cardBg,
+        foregroundColor: goldAccent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: goldAccent),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchHistory,
-            tooltip: '새로고침',
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: goldAccent.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: goldAccent.withOpacity(0.3)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _fetchHistory,
+              tooltip: '새로고침',
+              color: goldAccent,
+            ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
-          : _errorMessage != null
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _fetchHistory,
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도'),
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              darkBg,
+              const Color(0xFF1A1F3A),
+              darkBg,
+            ],
+          ),
         ),
-      )
-          : _history.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.history,
-              size: 64,
-              color: Colors.grey.shade400,
+        child: _isLoading
+            ? const Center(
+          child: CircularProgressIndicator(color: goldAccent),
+        )
+            : _errorMessage != null
+            ? Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: silverAccent.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: silverAccent.withOpacity(0.7),
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _fetchHistory,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('다시 시도'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: goldAccent,
+                    foregroundColor: darkBg,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              '번역 기록이 없습니다',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
+          ),
+        )
+            : _history.isEmpty
+            ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.history,
+                size: 64,
+                color: silverAccent.withOpacity(0.3),
               ),
-            ),
-          ],
-        ),
-      )
-          : RefreshIndicator(
-        onRefresh: _fetchHistory,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _history.length,
-          itemBuilder: (context, index) {
-            final record = _history[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${_getLangName(record.fromLang)} → ${_getLangName(record.toLang)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _formatDateTime(record.createdAt),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      record.originalText,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.arrow_forward,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            record.translatedText,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 16),
+              Text(
+                '번역 기록이 없습니다',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: silverAccent.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        )
+            : RefreshIndicator(
+          onRefresh: _fetchHistory,
+          color: goldAccent,
+          backgroundColor: cardBg,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _history.length,
+            itemBuilder: (context, index) {
+              final record = _history[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: darkCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: silverAccent.withOpacity(0.2),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  goldAccent.withOpacity(0.3),
+                                  goldAccent.withOpacity(0.1),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: goldAccent.withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              '${_getLangName(record.fromLang)} → ${_getLangName(record.toLang)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: goldAccent,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            _formatDateTime(record.createdAt),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: silverAccent.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        record.originalText,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: goldAccent.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward,
+                              size: 14,
+                              color: goldAccent,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              record.translatedText,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: goldAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
