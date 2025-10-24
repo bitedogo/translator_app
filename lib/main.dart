@@ -16,7 +16,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Translation App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       home: const HomePage(),
@@ -42,26 +45,59 @@ class _HomePageState extends State<HomePage> {
   ];
 
   void _navigateToHistory() {
+    HistoryType type;
+    switch (_currentIndex) {
+      case 0:
+        type = HistoryType.translation;
+        break;
+      case 1:
+        type = HistoryType.stt;
+        break;
+      case 2:
+        type = HistoryType.tts;
+        break;
+      default:
+        type = HistoryType.translation;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const TranslationHistoryPage(),
+        builder: (context) => TranslationHistoryPage(historyType: type),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    String tooltip;
+    const Color cardBg = Color(0xFF1A1F3A);
+    const Color goldAccent = Color(0xFFD4AF37);
+
+    switch (_currentIndex) {
+      case 0:
+        tooltip = '번역 기록';
+        break;
+      case 1:
+        tooltip = 'STT 기록';
+        break;
+      case 2:
+        tooltip = 'TTS 기록';
+        break;
+      default:
+        tooltip = '기록';
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('번역 앱'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        backgroundColor: cardBg,
+        foregroundColor: goldAccent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.history),
+            icon: const Icon(Icons.history, color: goldAccent),
             onPressed: _navigateToHistory,
-            tooltip: '번역 기록',
+            tooltip: tooltip,
           ),
         ],
       ),

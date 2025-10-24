@@ -30,6 +30,16 @@ class _TranslatorPageState extends State<TranslatorPage> {
     'Español': 'es',
     'Français': 'fr',
   };
+
+  final Map<String, String> _ttsLanguages = {
+    'ko': 'ko-KR',
+    'en': 'en-US',
+    'ja': 'ja-JP',
+    'zh': 'zh-CN',
+    'es': 'es-ES',
+    'fr': 'fr-FR',
+  };
+
   String _fromLanguage = 'ko';
   String _toLanguage = 'en';
 
@@ -54,26 +64,27 @@ class _TranslatorPageState extends State<TranslatorPage> {
   }
 
   Future<void> _initTTS() async {
-    _flutterTts.setStartHandler(() {
-      setState(() => _ttsState = TtsState.playing);
-    });
-    _flutterTts.setCompletionHandler(() {
-      setState(() => _ttsState = TtsState.stopped);
-    });
-    _flutterTts.setErrorHandler((msg) {
-      setState(() => _ttsState = TtsState.stopped);
-    });
+    try {
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setVolume(1.0);
+
+      _flutterTts.setStartHandler(() {
+        setState(() => _ttsState = TtsState.playing);
+      });
+      _flutterTts.setCompletionHandler(() {
+        setState(() => _ttsState = TtsState.stopped);
+      });
+      _flutterTts.setErrorHandler((msg) {
+        setState(() => _ttsState = TtsState.stopped);
+        _showSnackBar('음성 재생 오류: $msg', isError: true);
+      });
+    } catch (_) {}
   }
 
   Future<void> _translate() async {
     if (_textController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('번역할 텍스트를 입력하세요'),
-          backgroundColor: cardBg,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnackBar('번역할 텍스트를 입력하세요', isError: true);
       return;
     }
 
@@ -81,7 +92,8 @@ class _TranslatorPageState extends State<TranslatorPage> {
     _translatedController.text = '번역 중...';
 
     try {
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('$baseUrl/api/translations'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: json.encode({
@@ -89,11 +101,11 @@ class _TranslatorPageState extends State<TranslatorPage> {
           'fromLang': _fromLanguage,
           'toLang': _toLanguage,
         }),
-      );
+      )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
-
         if (data['success'] == true && data['translatedText'] != null) {
           setState(() {
             _translatedController.text = data['translatedText'];
@@ -107,43 +119,55 @@ class _TranslatorPageState extends State<TranslatorPage> {
       }
     } catch (e) {
       _translatedController.text = '번역 실패';
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('번역 오류: $e'),
-            backgroundColor: Colors.red.shade900,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      if (mounted) _showSnackBar('번역 오류: $e', isError: true);
     } finally {
       setState(() => _isTranslating = false);
     }
   }
 
   Future<void> _speak() async {
-    if (_translatedController.text.isNotEmpty) {
-      await _flutterTts.setLanguage(_toLanguage);
+    if (_translatedController.text.isEmpty ||
+        _translatedController.text == '번역 중...' ||
+        _translatedController.text == '번역 실패') {
+      _showSnackBar('번역된 텍스트가 없습니다', isError: true);
+      return;
+    }
+
+    try {
+      String ttsLang = _ttsLanguages[_toLanguage] ?? 'en-US';
+      await _flutterTts.setLanguage(ttsLang);
       await _flutterTts.speak(_translatedController.text);
+    } catch (e) {
+      _showSnackBar('음성 재생 실패: $e', isError: true);
     }
   }
 
   Future<void> _stop() async {
-    await _flutterTts.stop();
+    try {
+      await _flutterTts.stop();
+    } catch (_) {}
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade900 : cardBg,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: isError ? 4 : 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            darkBg,
-            const Color(0xFF1A1F3A),
-            darkBg,
-          ],
+          colors: [darkBg, Color(0xFF1A1F3A), darkBg],
         ),
       ),
       child: Padding(
@@ -184,10 +208,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: goldAccent.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: goldAccent.withOpacity(0.3), width: 1),
         boxShadow: [
           BoxShadow(
             color: goldAccent.withOpacity(0.1),
@@ -213,11 +234,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 color: goldAccent.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.arrow_forward,
-                color: goldAccent,
-                size: 20,
-              ),
+              child: const Icon(Icons.arrow_forward, color: goldAccent, size: 20),
             ),
             Expanded(
               child: _buildDropdown(
@@ -232,11 +249,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
     );
   }
 
-  Widget _buildDropdown(
-      String label,
-      String value,
-      ValueChanged<String?> onChanged,
-      ) {
+  Widget _buildDropdown(String label, String value, ValueChanged<String?> onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -254,7 +267,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
           child: DropdownButton<String>(
             value: value,
             dropdownColor: cardBg,
-            icon: Icon(Icons.arrow_drop_down, color: goldAccent),
+            icon: const Icon(Icons.arrow_drop_down, color: goldAccent),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 15,
@@ -266,7 +279,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 child: Text(entry.key),
               );
             }).toList(),
-            onChanged: onChanged,
+            onChanged: _isTranslating ? null : onChanged,
           ),
         ),
       ],
@@ -285,10 +298,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
       decoration: BoxDecoration(
         color: darkCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: silverAccent.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: silverAccent.withOpacity(0.2), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
@@ -322,22 +332,12 @@ class _TranslatorPageState extends State<TranslatorPage> {
             child: TextField(
               controller: controller,
               readOnly: readOnly,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                height: 1.5,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 15,
-                ),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 15),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 suffixIcon: suffixIcon,
               ),
               maxLines: null,
@@ -354,19 +354,10 @@ class _TranslatorPageState extends State<TranslatorPage> {
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            goldAccent.withOpacity(0.8),
-            goldAccent,
-          ],
-        ),
+        gradient: LinearGradient(colors: [goldAccent.withOpacity(0.8), goldAccent]),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: goldAccent.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
+          BoxShadow(color: goldAccent.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
       child: IconButton(
@@ -391,17 +382,12 @@ class _TranslatorPageState extends State<TranslatorPage> {
         gradient: LinearGradient(
           colors: _isTranslating
               ? [Colors.grey.shade700, Colors.grey.shade800]
-              : [
-            goldAccent,
-            const Color(0xFFFFD700),
-          ],
+              : [goldAccent, Color(0xFFFFD700)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: _isTranslating
-                ? Colors.transparent
-                : goldAccent.withOpacity(0.4),
+            color: _isTranslating ? Colors.transparent : goldAccent.withOpacity(0.4),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -416,20 +402,17 @@ class _TranslatorPageState extends State<TranslatorPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_isTranslating)
-                SizedBox(
+                const SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(
-                    color: darkBg,
-                    strokeWidth: 3,
-                  ),
+                  child: CircularProgressIndicator(color: darkBg, strokeWidth: 3),
                 )
               else
-                Icon(Icons.translate, color: darkBg, size: 24),
+                const Icon(Icons.translate, color: darkBg, size: 24),
               const SizedBox(width: 12),
               Text(
                 _isTranslating ? '번역 중...' : '번역하기',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: darkBg,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+const String baseUrl = 'http://10.0.2.2:3000';
 
 enum TtsState { playing, stopped, paused, continued }
 
@@ -15,14 +19,16 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
   final TextEditingController _textController = TextEditingController();
 
   TtsState _ttsState = TtsState.stopped;
+  bool _isInitialized = false;
+  String _statusMessage = '초기화 중...';
 
   final Map<String, String> _locales = {
-    '한국어': 'ko_KR',
-    'English': 'en_US',
-    '日本語': 'ja_JP'
+    '한국어': 'ko-KR',
+    'English': 'en-US',
+    '日本語': 'ja-JP'
   };
 
-  String _currentLocaleId = 'ko_KR';
+  String _currentLocaleId = 'ko-KR';
 
   static const Color darkBg = Color(0xFF0A0E27);
   static const Color cardBg = Color(0xFF1A1F3A);
@@ -44,45 +50,139 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
   }
 
   Future<void> _initTTS() async {
-    await _flutterTts.setLanguage(_currentLocaleId);
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setPitch(1.0);
+    try {
+      await _flutterTts.setLanguage(_currentLocaleId);
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setSharedInstance(true);
+      await _flutterTts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        [
+          IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+        ],
+        IosTextToSpeechAudioMode.defaultMode,
+      );
 
-    _flutterTts.setStartHandler(() {
-      setState(() => _ttsState = TtsState.playing);
-    });
-    _flutterTts.setCompletionHandler(() {
-      setState(() => _ttsState = TtsState.stopped);
-    });
-    _flutterTts.setErrorHandler((msg) {
-      setState(() => _ttsState = TtsState.stopped);
-    });
+      _flutterTts.setStartHandler(() {
+        setState(() {
+          _ttsState = TtsState.playing;
+          _statusMessage = '재생 중...';
+        });
+      });
 
-    setState(() {});
+      _flutterTts.setCompletionHandler(() {
+        setState(() {
+          _ttsState = TtsState.stopped;
+          _statusMessage = '준비 완료';
+        });
+        if (_textController.text.isNotEmpty) {
+          _saveToDatabase();
+        }
+      });
+
+      _flutterTts.setErrorHandler((msg) {
+        setState(() {
+          _ttsState = TtsState.stopped;
+          _statusMessage = '오류 발생';
+        });
+        _showSnackBar('음성 재생 오류: $msg', isError: true);
+      });
+
+      setState(() {
+        _isInitialized = true;
+        _statusMessage = '준비 완료';
+      });
+    } catch (e) {
+      setState(() => _statusMessage = '초기화 실패');
+      _showSnackBar('TTS 초기화 실패: $e', isError: true);
+    }
   }
 
   Future<void> _speak() async {
-    if (_textController.text.isNotEmpty) {
-      await _flutterTts.speak(_textController.text);
+    if (_textController.text.isEmpty) {
+      _showSnackBar('읽을 텍스트를 입력해주세요.', isError: true);
+      return;
+    }
+
+    if (!_isInitialized) {
+      _showSnackBar('TTS가 아직 초기화되지 않았습니다.', isError: true);
+      return;
+    }
+
+    try {
+      setState(() => _statusMessage = '재생 시작...');
+      final result = await _flutterTts.speak(_textController.text);
+
+      if (result == 0) {
+        _showSnackBar('음성 재생에 실패했습니다.', isError: true);
+        setState(() {
+          _ttsState = TtsState.stopped;
+          _statusMessage = '재생 실패';
+        });
+      }
+    } catch (e) {
+      _showSnackBar('음성 재생 오류: $e', isError: true);
+      setState(() {
+        _ttsState = TtsState.stopped;
+        _statusMessage = '재생 실패';
+      });
     }
   }
 
   Future<void> _stop() async {
-    await _flutterTts.stop();
+    try {
+      await _flutterTts.stop();
+      setState(() {
+        _ttsState = TtsState.stopped;
+        _statusMessage = '중지됨';
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveToDatabase() async {
+    if (_textController.text.isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/tts'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: json.encode({
+          'inputText': _textController.text,
+          'audioUrl': 'tts_output_${DateTime.now().millisecondsSinceEpoch}',
+          'voiceSetting': _currentLocaleId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true) {}
+      }
+    } catch (_) {}
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade900 : cardBg,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: isError ? 4 : 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            darkBg,
-            const Color(0xFF1A1F3A),
-            darkBg,
-          ],
+          colors: [darkBg, Color(0xFF1A1F3A), darkBg],
         ),
       ),
       child: Padding(
@@ -90,14 +190,59 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
         child: Column(
           children: [
             _buildLanguageSelector(),
+            const SizedBox(height: 16),
+            _buildStatusIndicator(),
             const SizedBox(height: 24),
-            Expanded(
-              child: _buildTextInputCard(),
-            ),
+            Expanded(child: _buildTextInputCard()),
             const SizedBox(height: 24),
             _buildSpeakButton(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: cardBg.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isInitialized
+              ? goldAccent.withOpacity(0.3)
+              : Colors.red.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _isInitialized ? Colors.green : Colors.red,
+              boxShadow: [
+                BoxShadow(
+                  color: (_isInitialized ? Colors.green : Colors.red)
+                      .withOpacity(0.5),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _statusMessage,
+            style: TextStyle(
+              color: silverAccent.withOpacity(0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -107,10 +252,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: goldAccent.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: goldAccent.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
             color: goldAccent.withOpacity(0.1),
@@ -124,7 +266,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.record_voice_over, color: goldAccent, size: 24),
+            const Icon(Icons.record_voice_over, color: goldAccent, size: 24),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +294,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
       child: DropdownButton<String>(
         value: _currentLocaleId,
         dropdownColor: cardBg,
-        icon: Icon(Icons.arrow_drop_down, color: goldAccent, size: 20),
+        icon: const Icon(Icons.arrow_drop_down, color: goldAccent, size: 20),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 15,
@@ -161,10 +303,13 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
         items: _locales.entries.map((entry) {
           return DropdownMenuItem<String>(
             value: entry.value,
+            enabled: _ttsState != TtsState.playing,
             child: Text(entry.key),
           );
         }).toList(),
-        onChanged: (newValue) async {
+        onChanged: _ttsState == TtsState.playing
+            ? null
+            : (newValue) async {
           if (newValue != null) {
             setState(() => _currentLocaleId = newValue);
             await _flutterTts.setLanguage(_currentLocaleId);
@@ -179,10 +324,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
       decoration: BoxDecoration(
         color: darkCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: silverAccent.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: silverAccent.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
@@ -203,11 +345,11 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
                 topRight: Radius.circular(20),
               ),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.edit_note, color: goldAccent, size: 20),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   '읽을 텍스트',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -232,7 +374,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
                 decoration: InputDecoration(
                   hintText: '여기에 읽을 내용을 입력하세요...',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white54,
                     fontSize: 15,
                   ),
                   border: InputBorder.none,
@@ -255,13 +397,14 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: _ttsState == TtsState.playing
-              ? [Colors.red.shade400, Colors.red.shade600]
-              : [goldAccent, const Color(0xFFFFD700)],
+              ? [Colors.redAccent, Colors.red]
+              : [goldAccent, Color(0xFFFFD700)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (_ttsState == TtsState.playing ? Colors.red : goldAccent)
+            color:
+            (_ttsState == TtsState.playing ? Colors.red : goldAccent)
                 .withOpacity(0.4),
             blurRadius: 20,
             offset: const Offset(0, 8),
@@ -284,7 +427,7 @@ class _TextToSpeechPageState extends State<TextToSpeechPage> {
               const SizedBox(width: 12),
               Text(
                 _ttsState == TtsState.playing ? '멈춤' : '읽어주기',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: darkBg,
